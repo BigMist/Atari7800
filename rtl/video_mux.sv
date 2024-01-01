@@ -45,6 +45,12 @@ module video_mux
 	output logic       pix_ce
 );
 
+`ifndef PALETTE_PATH
+localparam PALETTE_PATH="rtl/palettes/";
+`else
+localparam PALETTE_PATH=`PALETTE_PATH;
+`endif
+
 logic [23:0] out_color, nwarm_color, ncool_color, nhot_color,
 	pwarm_color, pcool_color, phot_color, custom_color, old_color;
 
@@ -164,7 +170,7 @@ end
 spram #(
 	.addr_width(8),
 	.data_width(24),
-	.mem_init_file("rtl/palettes/NWARM.mif")
+	.mem_init_file({PALETTE_PATH,"NWARM.mif"})
 ) nwarm
 (
 	.clock   (clk_sys),
@@ -175,7 +181,7 @@ spram #(
 spram #(
 	.addr_width(8),
 	.data_width(24),
-	.mem_init_file("rtl/palettes/NCOOL.mif")
+	.mem_init_file({PALETTE_PATH,"NCOOL.mif"})
 ) ncool
 (
 	.clock   (clk_sys),
@@ -186,7 +192,7 @@ spram #(
 spram #(
 	.addr_width(8),
 	.data_width(24),
-	.mem_init_file("rtl/palettes/NHOT.mif")
+	.mem_init_file({PALETTE_PATH,"NHOT.mif"})
 ) nhot
 (
 	.clock   (clk_sys),
@@ -197,7 +203,7 @@ spram #(
 spram #(
 	.addr_width(8),
 	.data_width(24),
-	.mem_init_file("rtl/palettes/PWARM.mif")
+	.mem_init_file({PALETTE_PATH,"PWARM.mif"})
 ) pwarm
 (
 	.clock   (clk_sys),
@@ -208,7 +214,7 @@ spram #(
 spram #(
 	.addr_width(8),
 	.data_width(24),
-	.mem_init_file("rtl/palettes/PCOOL.mif")
+	.mem_init_file({PALETTE_PATH,"PCOOL.mif"})
 ) pcool
 (
 	.clock   (clk_sys),
@@ -219,7 +225,7 @@ spram #(
 spram #(
 	.addr_width(8),
 	.data_width(24),
-	.mem_init_file("rtl/palettes/PHOT.mif")
+	.mem_init_file({PALETTE_PATH,"PHOT.mif"})
 ) phot
 (
 	.clock   (clk_sys),
@@ -230,7 +236,7 @@ spram #(
 spram #(
 	.addr_width(8),
 	.data_width(24),
-	.mem_init_file("rtl/palettes/PHOT.mif")
+	.mem_init_file({PALETTE_PATH,"PHOT.mif"})
 ) custom
 (
 	.clock   (clk_sys),
