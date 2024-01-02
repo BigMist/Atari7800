@@ -693,22 +693,7 @@ sdram sdram
 	.ch0_din    (cart_download ? ioctl_dout : cart_din),
 	.ch0_rd     (cart_read & ~cart_download & ~reset),
 	.ch0_dout   (cart_data_sd),
-	.ch0_busy   (cart_busy),
-
-	.ch1_addr   (/*cartram_addr*/),
-	.ch1_wr     (/*cartram_wr*/),
-	.ch1_din    (/*cartram_wrdata*/),
-	.ch1_rd     (/*cartram_rd*/),
-	.ch1_dout   (/*cartram_data*/),
-	.ch1_busy   (/*cartram_busy*/),
-
-	// reserved for backup ram save/load
-	.ch2_addr   (  ),
-	.ch2_wr     (  ),
-	.ch2_din    (  ),
-	.ch2_rd     (  ),
-	.ch2_dout   (  ),
-	.ch2_busy   (  )
+	.ch0_busy   (cart_busy)
 );
 
 //////////////////////////////  IO  /////////////////////////////////////
