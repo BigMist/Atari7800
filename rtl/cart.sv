@@ -78,8 +78,8 @@ logic pokey_irq_n, ym_irq_n;
 logic [31:0] cart_size_bs;
 
 wire XCTRL1_cs = (cart_xm[0] && address_in[15:4] == 8'h47) && cart_cs;
+assign cart_read = rw && cart_cs && ~cartram_cs;
 always @(posedge clk_sys) begin
-	cart_read <= rw && cart_cs;
 	if (reset) begin
 		XCTRL1 <= 0;
 	end else if (pclk0) begin
@@ -308,8 +308,9 @@ end
 
 wire [14:0] bankset_ram_addr = {bankset_banks | (~rw & &address_in[15:14]), address_in[13:0]};
 assign cartram_addr = is_bankset_mem ? bankset_ram_addr : (souper_en ? souper_addr[17:0] : ({ram_bank, address_in[13:0]} & ram_mask));
-assign cartram_wr = ((ram_cs || (~souper_ram_cs && souper_en)) && ~rw && pclk0);
-assign cartram_rd = ~cartram_wr;
+wire   cartram_cs = (ram_cs || (~souper_ram_cs && souper_en));
+assign cartram_wr = cartram_cs && ~rw;
+assign cartram_rd = cartram_cs &&  rw;
 assign cartram_wrdata = din;
 assign ram_dout = cartram_data;
 

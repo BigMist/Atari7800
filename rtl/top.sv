@@ -419,8 +419,8 @@ module Atari7800(
 		.tia_mode     (tia_mode)
 	);
 
-	assign cartram_wr = tia_en ? cartram_wr26 : cartram_wr78;
-	assign cartram_rd = tia_en ? cartram_rd26 : cartram_rd78;
+	assign cartram_wr = tia_en ? cartram_wr26 : (cartram_wr78 & mclk1);
+	assign cartram_rd = tia_en ? cartram_rd26 : (cartram_rd78 & mclk1);
 	assign cartram_addr = tia_en ? cartram_addr26 : cartram_addr78;
 	assign cartram_wrdata = tia_en ? cartram_wrdata26 : cartram_wrdata78;
 
@@ -431,6 +431,7 @@ module Atari7800(
 		reset_addr <= (reset && ~old_reset) ? 16'd0 : reset_addr + 1'd1;
 	end
 
+`ifndef EXTERNAL_CARTRAM
 	spram #(.addr_width(17), .mem_name("CART")) cart_ram
 	(
 		.clock   (clk_sys),
@@ -440,6 +441,9 @@ module Atari7800(
 		.q       (cartram_data_bram),
 		.cs      (~pause)
 	);
+`else
+	assign cartram_data_bram = cartram_data;
+`endif
 
 	cart cart
 	(

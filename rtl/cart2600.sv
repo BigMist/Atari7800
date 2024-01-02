@@ -146,8 +146,8 @@ module cart2600
 	assign rom_addr[BANKDPCP]     = '0;
 
 	assign cartram_addr = sel_ram_a;
-	assign cartram_wr = ~sel_ram_rw && sel_ram_sel && ~address_change;
-	assign cartram_rd = sel_ram_sel && ~cartram_wr;
+	assign cartram_wr = sel_ram_sel && ~sel_ram_rw && ~phi1 && ~address_change;
+	assign cartram_rd = sel_ram_sel &&  sel_ram_rw && ~phi1 && ~address_change;
 	assign cartram_wrdata = d_in;
 	assign cr_do = cartram_data;
 
