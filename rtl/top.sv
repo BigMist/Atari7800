@@ -39,6 +39,7 @@ module Atari7800(
 	output logic        cart_read,
 	input  logic [7:0]  cart_out, bios_out,
 	output logic [15:0] AB,
+	output logic        bios_sel,
 	output logic [24:0] cart_addr_out,
 	input  logic [15:0] cart_flags,
 	input  logic  [7:0] cart_save,
@@ -152,6 +153,7 @@ module Atari7800(
 	end
 
 	wire cs_cart = ~|{cs_ram0, cs_ram1, cs_tia, cs_riot, cs_maria};
+	assign bios_sel = cs_cart & ~bios_en_b && AB[15];
 
 	always_comb begin
 		read_DB = open_bus;
