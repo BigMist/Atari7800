@@ -842,6 +842,8 @@ paddle_timer pt1 (clk_sys, 1, reset, {1'b0, to_unsigned(joystick_analog_0[15:8])
 paddle_timer pt2 (clk_sys, 1, reset, {1'b0, to_unsigned(joystick_analog_1[ 7:0])}, ~iout[1], pread_mux2[2], pad_wire[2], difference2);
 paddle_timer pt3 (clk_sys, 1, reset, {1'b0, to_unsigned(joystick_analog_1[15:8])}, ~iout[1], pread_mux2[3], pad_wire[3], difference3);
 
+wire joya_b2 = ~PBout[2] && ~tia_en && joy0_type != 5;
+wire joyb_b2 = ~PBout[4] && ~tia_en && joy1_type != 5;
 
 assign PBin[7] = diff_right;               // Right diff
 assign PBin[6] = diff_left;                // Left diff
@@ -854,8 +856,8 @@ assign PBin[0] = ~m_one_player;            // Start/Reset
 
 assign PAin[7:4] = paddle ? {pad_muxa[3:2], 2'b11} : {~m_right,  ~m_left,  ~m_down,  ~m_up }; // P1: R L D U
 assign PAin[3:0] = paddle ? {pad_muxb[3:2], 2'b11} : {~m_right2, ~m_left2, ~m_down2, ~m_up2}; // P2: R L D U
-assign ilatch[0] = paddle ? 1'b1 : tia_en ? ~m_fireA  : ~(m_fireA  || m_fireB ); // P1 Fire
-assign ilatch[1] = paddle ? 1'b1 : tia_en ? ~m_fire2A : ~(m_fire2A || m_fire2B); // P2 Fire
+assign ilatch[0] = paddle ? 1'b1 : tia_en ? ~m_fireA  : (joya_b2 | ~(m_fireA  || m_fireB )); // P1 Fire
+assign ilatch[1] = paddle ? 1'b1 : tia_en ? ~m_fire2A : (joyb_b2 | ~(m_fire2A || m_fire2B)); // P2 Fire
 assign idump = paddle ? {pad_muxb[1:0], pad_muxa[1:0]} : tia_en ? {~m_fire2B, 1'd0, ~m_fireB, 1'd0} : {m_fire2A, m_fire2B, m_fireA, m_fireB}; // P2 F1, P2 F2, P1 F1, P1 F2 or Analog
 assign pad_muxa = paddleswap ? {~pad_b[0], ~pad_b[1], pad_wire[1:0]} : {~pad_b[1:0], pad_wire[0], pad_wire[1]};
 assign pad_muxb = paddleswap ? {~pad_b[2], ~pad_b[3], pad_wire[3:2]} : {~pad_b[3:2], pad_wire[2], pad_wire[3]};
