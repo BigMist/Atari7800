@@ -156,7 +156,7 @@ assign SDRAM2_nWE = 1;
 
 `include "build_id.v"
 
-assign LED  = ~ioctl_download;
+assign LED  = ~ioctl_download & ~bk_ena;
 
 parameter CONF_STR = {
 	"A7800;;",
@@ -177,7 +177,8 @@ parameter CONF_STR = {
 	"P1OE,De-comb,Off,On;",
 	"P1OR,Black&White,Off,On;",
 	"P1ON,Stereo TIA,No,Yes;",
-	"P2OT,Controller,Joystick,Paddle;",
+	"P2OTU,Controller1,Auto,Joystick,Paddle,SaveKey;",
+	"P2OXY,Controller2,Auto,Joystick,Paddle,SaveKey;",
 	"P2O4,Swap Joysticks,No,Yes;",
 	"P2OS,Swap Paddle A<->B,No,Yes;",
 	"P2O8,Difficulty Right,A,B;",
@@ -189,6 +190,10 @@ parameter CONF_STR = {
 	"P3OD,Pokey IRQ Enabled,No,Yes;",
 	"P3OFJ,Bankswitching,Auto,F8,F6,FE,E0,3F,F4,P2,FA,CV,2K,UA,E7,F0,32,AR,3E,SB,WD,EF;",
 	`SEP
+`ifdef USE_SAVERAM
+	"S0U,SAV,Load;",
+	"TZ,Write SaveKey/HSCart;",
+`endif
 	"T0,Reset;",
 	"V,v1.0.",`BUILD_DATE
 };
@@ -213,10 +218,11 @@ wire [1:0] hscart = status[25:24];
 wire       clearmem = status[26];
 wire       bwmode = status[27];
 wire       paddleswap = status[28];
-wire       paddle = status[29];
+wire [1:0] controller1 = status[30:29];
+wire [1:0] controller2 = status[34:33];
 wire       use_tape = 0;
 
-//wire       bk_save = status[15];
+wire       bk_save = status[35];
 
 ////////////////////   CLOCKS   ///////////////////
 
@@ -842,8 +848,80 @@ paddle_timer pt1 (clk_sys, 1, reset, {1'b0, to_unsigned(joystick_analog_0[15:8])
 paddle_timer pt2 (clk_sys, 1, reset, {1'b0, to_unsigned(joystick_analog_1[ 7:0])}, ~iout[1], pread_mux2[2], pad_wire[2], difference2);
 paddle_timer pt3 (clk_sys, 1, reset, {1'b0, to_unsigned(joystick_analog_1[15:8])}, ~iout[1], pread_mux2[3], pad_wire[3], difference3);
 
+assign pad_muxa = paddleswap ? {~pad_b[0], ~pad_b[1], pad_wire[1:0]} : {~pad_b[1:0], pad_wire[0], pad_wire[1]};
+assign pad_muxb = paddleswap ? {~pad_b[2], ~pad_b[3], pad_wire[3:2]} : {~pad_b[3:2], pad_wire[2], pad_wire[3]};
+assign pad_b = {m_fire2B, m_fire2A, m_fireB, m_fireA};
+
 wire joya_b2 = ~PBout[2] && ~tia_en && joy0_type != 5;
 wire joyb_b2 = ~PBout[4] && ~tia_en && joy1_type != 5;
+
+reg [7:0] porta_type, portb_type;
+//  0 = none
+//  1 = 7800 joystick
+//  2 = lightgun
+//  3 = paddle
+//  4 = trakball
+//  5 = 2600 joystick
+//  6 = 2600 driving
+//  7 = 2600 keypad
+//  8 = ST mouse
+//  9 = Amiga mouse
+//  10 = AtariVox/SaveKey
+//  11 = SNES2Atari
+always @(*) begin
+	porta_type = 0;
+	if (controller1 == 0) begin
+		// auto
+		case (joy0_type)
+			0: porta_type = 8'd0;
+			1: porta_type = 8'd1;
+			2: porta_type = 8'd2;
+			3: porta_type = 8'd3;
+			4: porta_type = 8'd4;
+			5: porta_type = 8'd1;
+			6: porta_type = 8'd6;
+			7: porta_type = 8'd5;
+			8: porta_type = 8'd8;
+			9: porta_type = 8'd9;
+			10: porta_type = 8'd10;
+		default: porta_type = 8'd1;
+	endcase
+	end else begin
+		case(controller1)
+		2'd1: porta_type = 1; // joystick
+		2'd2: porta_type = 3; // paddle
+		2'd3: porta_type = 10; // SaveKey
+		default:;
+		endcase
+	end
+
+	portb_type = 0;
+	if (controller2 == 0) begin
+		// auto
+		case (joy0_type)
+			0: portb_type = 8'd0;
+			1: portb_type = 8'd1;
+			2: portb_type = 8'd2;
+			3: portb_type = 8'd3;
+			4: portb_type = 8'd4;
+			5: portb_type = 8'd1;
+			6: portb_type = 8'd6;
+			7: portb_type = 8'd5;
+			8: portb_type = 8'd8;
+			9: portb_type = 8'd9;
+			10: portb_type = 8'd10;
+		default: portb_type = 8'd1;
+	endcase
+	end else begin
+		case(controller2)
+		2'd1: portb_type = 1; // joystick
+		2'd2: portb_type = 3; // paddle
+		2'd3: portb_type = 10; // SaveKey
+		default:;
+		endcase
+	end
+
+end
 
 assign PBin[7] = diff_right;               // Right diff
 assign PBin[6] = diff_left;                // Left diff
@@ -854,28 +932,14 @@ assign PBin[2] = PBout[2];                 // Unused (used for 2 button sensing)
 assign PBin[1] = (~m_fireC & ~m_fire2C);   // Select
 assign PBin[0] = ~m_one_player;            // Start/Reset
 
-assign PAin[7:4] = paddle ? {pad_muxa[3:2], 2'b11} : {~m_right,  ~m_left,  ~m_down,  ~m_up }; // P1: R L D U
-assign PAin[3:0] = paddle ? {pad_muxb[3:2], 2'b11} : {~m_right2, ~m_left2, ~m_down2, ~m_up2}; // P2: R L D U
-assign ilatch[0] = paddle ? 1'b1 : tia_en ? ~m_fireA  : (joya_b2 | ~(m_fireA  || m_fireB )); // P1 Fire
-assign ilatch[1] = paddle ? 1'b1 : tia_en ? ~m_fire2A : (joyb_b2 | ~(m_fire2A || m_fire2B)); // P2 Fire
-assign idump = paddle ? {pad_muxb[1:0], pad_muxa[1:0]} : tia_en ? {~m_fire2B, 1'd0, ~m_fireB, 1'd0} : {m_fire2A, m_fire2B, m_fireA, m_fireB}; // P2 F1, P2 F2, P1 F1, P1 F2 or Analog
-assign pad_muxa = paddleswap ? {~pad_b[0], ~pad_b[1], pad_wire[1:0]} : {~pad_b[1:0], pad_wire[0], pad_wire[1]};
-assign pad_muxb = paddleswap ? {~pad_b[2], ~pad_b[3], pad_wire[3:2]} : {~pad_b[3:2], pad_wire[2], pad_wire[3]};
-assign pad_b = {m_fire2B, m_fire2A, m_fireB, m_fireA};
+assign PAin[7:4] = porta_type == 3 ? {pad_muxa[3:2], 2'b11} : porta_type == 10 ? {1'b1,ep_do,2'b11} : {~m_right,  ~m_left,  ~m_down,  ~m_up }; // P1: R L D U
+assign PAin[3:0] = portb_type == 3 ? {pad_muxb[3:2], 2'b11} : portb_type == 10 ? {1'b1,ep_do,2'b11} : {~m_right2, ~m_left2, ~m_down2, ~m_up2}; // P2: R L D U
+assign ilatch[0] = porta_type == 3 ? 1'b1 : tia_en ? ~m_fireA  : (joya_b2 | ~(m_fireA  || m_fireB )); // P1 Fire
+assign ilatch[1] = portb_type == 3 ? 1'b1 : tia_en ? ~m_fire2A : (joyb_b2 | ~(m_fire2A || m_fire2B)); // P2 Fire
+assign idump[1:0] = porta_type == 3 ? pad_muxa[1:0] : tia_en ? {~m_fireB,  1'd0} : {m_fireA,  m_fireB}; // P2 F1, P2 F2, P1 F1, P1 F2 or Analog
+assign idump[3:2] = portb_type == 3 ? pad_muxb[1:0] : tia_en ? {~m_fire2B, 1'd0} : {m_fire2A, m_fire2B}; // P2 F1, P2 F2, P1 F1, P1 F2 or Analog
 
 //////////////////////////// BACKUP RAM /////////////////////
-reg bk_pending;
-wire bk_load    = 0;
-reg  bk_loading = 0;
-reg  bk_state   = 0;
-/*
-always @(posedge clk_sys) begin
-	if (bk_ena && ~OSD_STATUS && bk_save_write)
-		bk_pending <= 1'b1;
-	else if (bk_state)
-		bk_pending <= 1'b0;
-end
-
 logic [7:0] sk_data;
 logic [14:0] sk_addr;
 logic sk_read, sk_write;
@@ -883,12 +947,11 @@ logic sk_read, sk_write;
 logic [7:0] sk_ram_do;
 logic [14:0] sk_ram_addr;
 
-wire bk_save_write = use_sk ? sk_write : (~RW & hsc_ram_cs);
-
-assign use_sk = porta_type == 11 || portb_type == 11;
+assign use_sk = porta_type == 10 || portb_type == 10;
 
 // LEFT (pin 3) SDA
 // RIGHT (pin 4) SCL
+wire ep_do; // SDA
 
 EEPROM_24LC0X
 #(
@@ -898,8 +961,8 @@ EEPROM_24LC0X
 	.clk            (clk_sys),
 	.ce             (1),
 	.reset          (reset || ~use_sk),
-	.SCL            (portb_type == 11 ? PAout[3] : PAout[7]),
-	.SDA_in         (portb_type == 11 ? PAout[2] : PAout[6]),
+	.SCL            (portb_type == 10 ? PAout[3] : PAout[7]),
+	.SDA_in         (portb_type == 10 ? PAout[2] : PAout[6]),
 	.SDA_out        (ep_do),
 	.E_id           (0),
 	.WC_n           (0),
@@ -911,6 +974,9 @@ EEPROM_24LC0X
 	.ram_done       (1)
 );
 
+reg bk_ena = 0;
+
+`ifdef USE_SAVERAM
 dpram_dc #(.widthad_a(14)) hsc_ram
 (
 	.clock_a   (clk_sys),
@@ -920,62 +986,51 @@ dpram_dc #(.widthad_a(14)) hsc_ram
 	.q_a       (hsc_ram_dout),
 
 	.clock_b   (clk_sys),
-	.address_b ({sd_lba[0][5:0],sd_buff_addr}),
+	.address_b ({sd_lba[5:0],sd_buff_addr}),
 	.data_b    (sd_buff_dout),
 	.wren_b    (sd_buff_wr & sd_ack),
-	.q_b       (sd_buff_din[0])
+	.q_b       (sd_buff_din)
 );
 
-wire downloading = cart_download;
-reg old_downloading = 0;
-reg bk_ena = 0;
+
 always @(posedge clk_sys) begin
+	reg  bk_load = 0, old_load = 0, old_save = 0, old_ack, old_mounted = 0;
+	reg  bk_state = 0;
 
-	old_downloading <= downloading;
-	if(~old_downloading & downloading) bk_ena <= 0;
+	old_mounted <= img_mounted[0];
+	if(~old_mounted && img_mounted[0]) begin
+		bk_ena <= |img_size;
+		bk_load <= |img_size;
+	end
 
-	//Save file always mounted in the end of downloading state.
-	if(downloading && img_mounted && !img_readonly) bk_ena <= 1;
-end
-
-always @(posedge clk_sys) begin : save_block
-	reg old_load = 0, old_save = 0, old_ack;
-
-	old_load <= bk_load & bk_ena;
-	old_save <= bk_save & bk_ena;
+	old_load <= bk_load;
+	old_save <= bk_save;
 	old_ack  <= sd_ack;
 
 	if(~old_ack & sd_ack) {sd_rd, sd_wr} <= 0;
 
 	if(!bk_state) begin
-		if((~old_load & bk_load) | (~old_save & bk_save)) begin
+		if(bk_ena & ((~old_load & bk_load) | (~old_save & bk_save))) begin
 			bk_state <= 1;
-			bk_loading <= bk_load;
-			sd_lba[0] <= 0;
+			sd_lba <= 0;
 			sd_rd <=  bk_load;
 			sd_wr <= ~bk_load;
 		end
-		if(old_downloading & ~downloading & |img_size & bk_ena) begin
-			bk_state <= 1;
-			bk_loading <= 1;
-			sd_lba[0] <= 0;
-			sd_rd <= 1;
-			sd_wr <= 0;
-		end
 	end else begin
 		if(old_ack & ~sd_ack) begin
-			if(&sd_lba[0][5:0]) begin
-				bk_loading <= 0;
+			if(&sd_lba[5:0]) begin
+				bk_load <= 0;
 				bk_state <= 0;
 			end else begin
-				sd_lba[0] <= sd_lba[0] + 1'd1;
-				sd_rd  <=  bk_loading;
-				sd_wr  <= ~bk_loading;
+				sd_lba <= sd_lba + 1'd1;
+				sd_rd  <=  bk_load;
+				sd_wr  <= ~bk_load;
 			end
 		end
 	end
 end
-*/
+`endif
+
 endmodule
 
 module lfsr(
