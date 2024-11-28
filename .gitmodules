@@ -4,3 +4,6 @@
 [submodule "rtl/T65"]
 	path = rtl/T65
 	url = https://github.com/mist-devel/T65.git
+[submodule "BigMist/mist-modules"]
+	path = BigMist/mist-modules
+	url = https://github.com/mist-devel/mist-modules.git
